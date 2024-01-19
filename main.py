@@ -13,10 +13,6 @@ async def get_main():
     return {"message": "Welcome to Code Process Helper!"}
 
 
-@app.get("/runcode")
-async def run_code_get():
-    return {"message": "This is the runcode endpoint, you get it!"}
-
 @app.post("/runcode")
 async def run_code_post(
         code: str = Form(...),
