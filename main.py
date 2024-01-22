@@ -13,7 +13,7 @@ async def get_main():
     return {"message": "Welcome to Code Process Helper!"}
 
 
-@app.post("/runcode")
+@app.post("/uploadCodeAndFile")
 async def run_code_post(
         code: str = Form(...),
         file: UploadFile = File(...)
