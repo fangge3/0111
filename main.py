@@ -4,7 +4,7 @@ from fastapi.encoders import jsonable_encoder
 import tempfile
 import subprocess
 import pandas as pd
-
+# import base64
 
 app = FastAPI()
 
@@ -13,10 +13,11 @@ async def get_main():
     return {"message": "Welcome to Code Process Helper!"}
 
 
+
 @app.post("/uploadCodeAndFile")
 async def run_code_post(
         code: str = Form(...),
-        file: UploadFile = File(...)
+        file: UploadFile = Form(...),
 ):
     if file.content_type != "text/csv":
         raise HTTPException(status_code=415, detail="File type is not csv")
@@ -31,18 +32,17 @@ async def run_code_post(
         temp_csv.write(content)
         temp_csv_path = temp_csv.name
 
+    # code = base64.b64decode(code).decode()
+    # print(code)
     try:
-        result = subprocess.run(["python",'-c', code, temp_csv_path],capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
+        result = subprocess.run(["python", '-c', code, temp_csv_path],capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
         if result.returncode != 0:
             return {"error": result.stderr}
             # raise Exception("Subprocess failed with return code", result.returncode)
         # 子进程运行后
         output = {"message": "Code executed successfully", "output": result.stdout}
         return JSONResponse(content=jsonable_encoder(output))
-        # with open('output.txt', 'r', encoding='utf-8') as file:
-        #     print("==================")
-        #     print(file.read())
-        # return JSONResponse(content=output)
+
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=500, detail="Compilation timed out")
     except subprocess.CalledProcessError as e:
