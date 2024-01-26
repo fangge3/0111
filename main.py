@@ -17,7 +17,7 @@ async def get_main():
 @app.post("/uploadCodeAndFile")
 async def run_code_post(
         code: str = Form(...),
-        file: UploadFile = Form(...),
+        file: UploadFile = File(...),
 ):
     if file.content_type != "text/csv":
         raise HTTPException(status_code=415, detail="File type is not csv")
@@ -40,7 +40,7 @@ async def run_code_post(
             return {"error": result.stderr}
             # raise Exception("Subprocess failed with return code", result.returncode)
         # 子进程运行后
-        output = {"message": "Code executed successfully", "output": result.stdout}
+        output = {"message": "Code executed successfully", "result": result.stdout}
         return JSONResponse(content=jsonable_encoder(output))
 
     except subprocess.TimeoutExpired:
