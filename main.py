@@ -15,27 +15,26 @@ async def get_main():
 async def run_code_post(
         *,
         uploadCode: str = Form(...),
-        uploadFile: UploadFile = File(...)
+        # uploadFile: UploadFile = File(...)
+        uploadFile: str = Form(...)
 ):
 
     # if uploadFile.content_type!= "text/csv":
     #     raise HTTPException(status_code=415, detail="File type is not csv")
 
-    content = await uploadFile.read()
-    # 1. 临时存储CSV文件
+    # content = await uploadFile.read()
+    # 1. 临时存储CSV文件linux系统使用
     # with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", encoding="utf-16") as temp_csv:
     #     content = await uploadFile.read()
     #     temp_csv.write(content)
     #     temp_csv_path = temp_csv.name
 
-    # 创建临时文件
+    # 1. 创建临时文件 Windows系统
     fd, temp_csv_path = tempfile.mkstemp(suffix=".csv", text=True)
     os.close(fd)
     # 使用正确的编码解析文件内容并存储为 CSV
-    with open(temp_csv_path, 'wb') as temp_csv:
-        temp_csv.write(content)
-
-    print(temp_csv_path)
+    with open(temp_csv_path, 'w') as temp_csv:
+        temp_csv.write(uploadFile)
 
     code1 = """temp_csv_path = r'{}'
     {}
