@@ -6,6 +6,7 @@ import os
 from pydantic import BaseModel
 from typing import Optional
 import csv
+import re
 
 app = FastAPI()
 
@@ -25,6 +26,7 @@ async def execute_code(code_request: CodeRequest):
     if not code:
         raise HTTPException(status_code=400, detail="Bad request. Missing 'code' field.")
 
+    # 有文件情况
     if file is not None:
         lines = file.split("\n")
         header = lines[0].split()
@@ -44,9 +46,13 @@ async def execute_code(code_request: CodeRequest):
     #     content = await uploadFile.read()
     #     temp_csv.write(content)
     #     temp_csv_path = temp_csv.name
+        pattern = r"'/mnt/data.*\.(txt|csv)'"
+        code_with_file = re.sub(pattern, repr(temp_csv_path), code)
+        print(code_with_file)
+
         try:
             # result = subprocess.run(["python", temp_py_path], text=True, timeout=30, capture_output=True)
-            result = subprocess.run(["python", '-c', code], text=True, timeout=30, capture_output=True)
+            result = subprocess.run(["python", '-c', code_with_file], text=True, timeout=30, capture_output=True)
             if result.returncode != 0:
                 return {"error": result.stderr}
 
@@ -73,6 +79,7 @@ async def execute_code(code_request: CodeRequest):
     # with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp_py:
     #     temp_py.write(code)
     #     temp_py_path = temp_py.name
+
         try:
             # result = subprocess.run(["python", temp_py_path], text=True, timeout=30, capture_output=True)
             result = subprocess.run(["python", '-c', code], text=True, timeout=30, capture_output=True)
