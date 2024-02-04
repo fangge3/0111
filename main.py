@@ -7,12 +7,12 @@ from pydantic import BaseModel
 from typing import Optional
 import csv
 import re
+import shutil
 
 app = FastAPI()
 
 class CodeRequest(BaseModel):
     code: str
-    # file: Optional[UploadFile] = None
     file_string: Optional[str] = None
 
 @app.get("/")
@@ -31,11 +31,11 @@ async def execute_code(code_request: CodeRequest):
         lines = file.split("\n")
         header = lines[0].split()
         data_rows = [line.split() for line in lines[1:]]
-    # 1. 创建临时文件 Windows系统
+        # 1. 创建临时文件 Windows系统
         fd, temp_csv_path = tempfile.mkstemp(suffix=".csv", text=True)
         os.close(fd)
         # 使用正确的编码解析文件内容并存储为 CSV
-        with open(temp_csv_path, 'w', newline='') as csvfile:
+        with open(temp_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile, delimiter=',')
             # 写入表头
             writer.writerow(header)
@@ -46,13 +46,17 @@ async def execute_code(code_request: CodeRequest):
     #     content = await uploadFile.read()
     #     temp_csv.write(content)
     #     temp_csv_path = temp_csv.name
-        pattern = r"'/mnt/data.*\.(txt|csv)'"
-        code_with_file = re.sub(pattern, repr(temp_csv_path), code)
-        print(code_with_file)
+
+        pattern = r'/mnt/data.*\.(txt|csv)'
+        code_with_file = re.sub(pattern, repr(temp_csv_path).strip("'"), code)
+
+        required_packages = ["pandas", "numpy", "scikit-learn", "xgboost", "matplotlib"]
 
         try:
+            install_packages(required_packages)
             # result = subprocess.run(["python", temp_py_path], text=True, timeout=30, capture_output=True)
             result = subprocess.run(["python", '-c', code_with_file], text=True, timeout=30, capture_output=True)
+            # result = subprocess.run(["python", '-c', code_with_file], text=True, timeout=30, capture_output=True)
             if result.returncode != 0:
                 return {"error": result.stderr}
 
@@ -66,26 +70,19 @@ async def execute_code(code_request: CodeRequest):
         finally:
             # Cleanup: delete the temporary files
             os.remove(temp_csv_path)
+            print(temp_csv_path)
 
+    # 没有文件情况，直接执行代码
     else:
-
-
-
-    # code1 = """temp_csv_path = r'{}'
-    # {}
-    # """.format(temp_csv_path, uploadCode)
-
-
     # with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp_py:
     #     temp_py.write(code)
     #     temp_py_path = temp_py.name
-
         try:
             # result = subprocess.run(["python", temp_py_path], text=True, timeout=30, capture_output=True)
+            # result = subprocess.run(["/home/user/.virtualenvs/0111/bin/python", '-c', code], text=True, timeout=30, capture_output=True)
             result = subprocess.run(["python", '-c', code], text=True, timeout=30, capture_output=True)
             if result.returncode != 0:
                 return {"error": result.stderr}
-
             # Return the output
             output = {"message": "Code executed successfully", "result": result.stdout}
             return JSONResponse(content=output)
@@ -94,11 +91,9 @@ async def execute_code(code_request: CodeRequest):
         except subprocess.CalledProcessError as e:
             raise HTTPException(status_code=500, detail=str(e))
         finally:
-            # Cleanup: delete the temporary files
-            # os.remove(temp_py_path)
-            # os.remove(temp_csv_path)
             pass
-
+def install_packages(packages):
+    subprocess.run(['pip', 'install'] + packages)
 
 
 if __name__ == "__main__":
