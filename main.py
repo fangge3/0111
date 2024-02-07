@@ -9,6 +9,9 @@ import csv
 import re
 import importlib
 import uuid
+import ast
+
+
 
 app = FastAPI()
 
@@ -27,7 +30,7 @@ async def get_main():
     return {"message": "Welcome to Code Process Helper!"}
 
 
-@app.post("/package")
+# @app.post("/package")
 async def package(package: Packages):
     if install_packages(package.p):
         return JSONResponse(content='success')
@@ -58,33 +61,22 @@ async def execute_code(code_request: CodeRequest):
     filename = code_request.file_string
     if not code:
         raise HTTPException(status_code=400, detail="Bad request. Missing 'code' field.")
-
-    required_packages = ["pandas", "numpy", "scikit-learn", "xgboost", "matplotlib"]
+    lines = code.split("\n")
+    for line in lines:
+        if line.startswith("import") or line.startswith("from"):
+            try:
+                exec(line, globals())
+            except ModuleNotFoundError as e:
+                module_name = e.name
+                print(f"\033[41mError: Required module not found ({e.name}).\033[0m")
+                print(f"\033[43mpip install {e.name}\033[0m")
+                try:
+                    subprocess.run(["pip", "install", module_name])
+                except Exception as e:
+                    print(f"\033[41mError: {e}\033[0m")
 
     # 有文件情况
     if filename is not None:
-        # lines = file.split("\n")
-        # header = lines[0].split()
-        # data_rows = [line.split() for line in lines[1:]]
-        # # 1. 创建临时文件 Windows系统
-        # fd, temp_csv_path = tempfile.mkstemp(suffix=".csv", text=True)
-        # os.close(fd)
-        # # 使用正确的编码解析文件内容并存储为 CSV
-        # with open(temp_csv_path, 'w', newline='', encoding='utf-8') as csvfile:
-        #     writer = csv.writer(csvfile, delimiter=',')
-        #     # 写入表头
-        #     writer.writerow(header)
-        #     # 写入数据行
-        #     writer.writerows(data_rows)
-        # 1. 临时存储CSV文件linux系统使用
-        # with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", encoding="utf-16") as temp_csv:
-        #     content = await uploadFile.read()
-        #     temp_csv.write(content)
-        #     temp_csv_path = temp_csv.name
-
-        # pattern = r'path.*\.(txt|csv)'
-        # code_with_file = re.sub(pattern, repr(file_path).strip("'"), code)
-
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         pattern = re.compile(r"'(path_to[^']*)'")
         if os.path.exists(file_path):
@@ -93,19 +85,15 @@ async def execute_code(code_request: CodeRequest):
             raise HTTPException(status_code=400, detail="Bad request. File not found, please upload the file first.")
 
         try:
-            # install_packages(required_packages)
-            result = subprocess.run(["python", '-c', code_with_file], text=True, timeout=30, capture_output=True)
-            # result = subprocess.run(["/home/user/.virtualenvs/0111/bin/python", '-c', code_with_file], text=True, timeout=30, capture_output=True)
-            if result.returncode != 0:
-                return {"error": result.stderr}
-
-            # Return the output
-            output = {"message": "Code executed successfully", "result": result.stdout}
-            return JSONResponse(content=output)
-        except subprocess.TimeoutExpired:
-            raise HTTPException(status_code=500, detail="Compilation timed out")
-        except subprocess.CalledProcessError as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            # 创建一个空字典，用于存储执行结果
+            exec_result = {}
+            # 使用exec()执行代码，并将执行结果存储到exec_result字典中
+            exec(code_with_file, {}, exec_result)
+            # 如果代码执行成功，返回消息和结果
+            return {"message": "Code executed successfully", "result": exec_result.get("results")}
+        except Exception as e:
+            # 如果执行过程中出现异常，返回错误消息
+            return {"error": str(e)}
         finally:
             # Cleanup: delete the temporary files
             # os.remove(temp_csv_path)
