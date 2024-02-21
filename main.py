@@ -9,7 +9,8 @@ import csv
 import re
 import importlib
 import uuid
-import ast
+import pandas as pd
+from io import StringIO
 
 
 
@@ -45,7 +46,7 @@ def get_unique_filename(filename):
     _, file_extension = os.path.splitext(filename)
     return f"{unique_filename}{file_extension}"
 
-@app.post("/upload/")
+# @app.post("/upload/")
 async def upload_file(file: UploadFile = File(...)):
     filename = get_unique_filename(file.filename)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
@@ -58,7 +59,7 @@ async def upload_file(file: UploadFile = File(...)):
 @app.post("/execute")
 async def execute_code(code_request: CodeRequest):
     code = code_request.code
-    filename = code_request.file_string
+    received_string = code_request.file_string
     if not code:
         raise HTTPException(status_code=400, detail="Bad request. Missing 'code' field.")
     lines = code.split("\n")
@@ -76,11 +77,18 @@ async def execute_code(code_request: CodeRequest):
                     print(f"\033[41mError: {e}\033[0m")
 
     # 有文件情况
-    if filename is not None:
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if received_string is not None:
+        # file_path = os.path.join(UPLOAD_FOLDER, filename)
+        df_received = pd.read_csv(StringIO(received_string))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as temp_csv:
+            df_received.to_csv(temp_csv.name, index=False)
+            temp_csv_path = temp_csv.name
+
+        print(f"Temp CSV file created at: {temp_csv_path}")
+
         pattern = re.compile(r"'(path_to[^']*)'")
-        if os.path.exists(file_path):
-            code_with_file = pattern.sub(f"'{file_path}'", code)
+        if os.path.exists(temp_csv_path):
+            code_with_file = pattern.sub(f"'{temp_csv_path}'", code)
         else:
             raise HTTPException(status_code=400, detail="Bad request. File not found, please upload the file first.")
 
@@ -88,6 +96,7 @@ async def execute_code(code_request: CodeRequest):
             # 创建一个空字典，用于存储执行结果
             exec_result = {}
             # 使用exec()执行代码，并将执行结果存储到exec_result字典中
+            print(code_with_file)
             exec(code_with_file, {}, exec_result)
             # 如果代码执行成功，返回消息和结果
             return {"message": "Code executed successfully", "result": exec_result.get("results")}
